@@ -1,0 +1,3 @@
+<?php
+// Configuration settings for SimplePHP app
+// ...config values will go here...
