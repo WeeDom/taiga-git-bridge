@@ -107,3 +107,123 @@ Day 5: README, sequence diagram, screenshots, local deploy, short write-up.
 
 
 Deliverables Public repo, Docker setup, detailed README, screenshots, and a brief blog/case study. Stretch goals: CLI reconciliation, GitHub Action, mocked-API tests, CI.
+
+
+## further clarification of steps needed.
+
+
+🔧 Step 1. Decide on mapping (source of truth)
+
+Epic ↔ GitHub Milestone
+
+Story ↔ GitHub Issue
+
+Task ↔ GitHub Issue (labelled task)
+
+Taiga bug ↔ GitHub Issue (labelled bug)
+
+Status ↔ GitHub Project column
+
+👉 Add Taiga ID into GitHub Issue title or label (e.g. [TG-123] Story title). That becomes your “foreign key” for syncing.
+
+🔧 Step 2. Set up Taiga webhooks
+
+In your Taiga project, go to Admin → Webhooks.
+
+Create a webhook pointing to your bridge service (e.g. https://your-bridge/taiga/webhook).
+
+Configure it to fire on: userstory, task, issue, and epic.
+
+🔧 Step 3. Set up GitHub webhooks
+
+In your GitHub repo, go to Settings → Webhooks → Add Webhook.
+
+URL: https://your-bridge/github/webhook.
+
+Choose events: issues, milestone, pull_request.
+
+🔧 Step 4. Write the bridge service
+
+Basic flow (Python/Flask example):
+
+from flask import Flask, request
+import requests
+
+app = Flask(__name__)
+
+# Taiga → GitHub
+@app.route("/taiga/webhook", methods=["POST"])
+def taiga_webhook():
+    data = request.json
+    if data["type"] == "userstory":
+        story_id = data["data"]["id"]
+        title = f"[TG-{story_id}] {data['data']['subject']}"
+        desc = data["data"]["description"]
+        state = data["data"]["status"]
+
+        sync_story_to_github(story_id, title, desc, state)
+    return "ok"
+
+# GitHub → Taiga
+@app.route("/github/webhook", methods=["POST"])
+def github_webhook():
+    data = request.json
+    if "issue" in data:
+        issue = data["issue"]
+        taiga_id = extract_taiga_id(issue["title"])
+        if data["action"] == "closed":
+            mark_story_done_in_taiga(taiga_id)
+    return "ok"
+
+🔧 Step 5. Implement API helpers
+
+GitHub REST API v3
+
+Create/Update Issue: POST /repos/{owner}/{repo}/issues
+
+Close Issue: PATCH /repos/{owner}/{repo}/issues/{issue_number}
+
+Taiga API
+
+Stories: PATCH /userstories/{id} (to update status)
+
+Tasks: PATCH /tasks/{id}
+
+Epics: PATCH /epics/{id}
+
+🔧 Step 6. Handle conflicts
+
+Decide rules:
+
+If Story closed in GitHub → always mark closed in Taiga.
+
+If status changed in Taiga → update Project column in GitHub.
+
+Epics/milestones: keep titles/descriptions in sync.
+
+🔧 Step 7. Deploy + secure
+
+Deploy the bridge (Heroku, Render, Fly.io, or your own VPS).
+
+Add secret tokens to webhooks (both sides support a signing secret).
+
+Store Taiga + GitHub API tokens as environment variables.
+
+🔧 Step 8. Test
+
+Create a Story in Taiga → should auto-create a GitHub Issue with the right milestone.
+
+Close Issue via PR → Taiga Story moves to “Done.”
+
+Update Epic in Taiga → milestone in GitHub updates.
+
+## Note on Taiga Webhook URLs
+
+Taiga does not accept webhook URLs that use `localhost` or private IP addresses (e.g., `192.168.*`).
+
+To test webhooks locally, you must expose your bridge service to the public internet using a service like [ngrok](https://ngrok.com/) or [localtunnel](https://localtunnel.github.io/www/).
+
+More simply - add something lie `127.0.0.1   slimphp.local` to the host (dev machine) /etc/hosts.
+
+
+Set your webhook URL in Taiga to the public address provided by these tunneling services.

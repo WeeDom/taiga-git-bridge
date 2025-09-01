@@ -57,4 +57,10 @@ $app->get('/routes', function ($request, $response, $args) use ($app) {
     return $response->withHeader('Content-Type', 'application/json');
 });
 
+$app->map(['GET', 'POST'], '/webhook', function ($request, $response, $args) {
+    $data = $request->getParsedBody();
+    $response->getBody()->write('Webhook received: ' . json_encode($data));
+    return $response->withHeader('Content-Type', 'application/json');
+});
+
 $app->run();
