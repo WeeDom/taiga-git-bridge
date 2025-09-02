@@ -227,3 +227,102 @@ More simply - add something lie `127.0.0.1   slimphp.local` to the host (dev mac
 
 
 Set your webhook URL in Taiga to the public address provided by these tunneling services.
+# Debugging with Xdebug and VS Code in Docker
+
+## Step-by-step setup and troubleshooting
+
+### 1. Install and configure Xdebug in Docker
+- Use the official PHP Docker image (e.g., `php:8.2-apache`).
+- Install Xdebug via PECL in your Dockerfile:
+  ```Dockerfile
+  RUN pecl install xdebug \
+      && docker-php-ext-enable xdebug
+  COPY xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+  ```
+- Example `xdebug.ini`:
+  ```ini
+  zend_extension=xdebug
+  xdebug.mode=debug
+  xdebug.start_with_request=yes
+  xdebug.client_host=<your_host_ip>
+  xdebug.client_port=9003
+  xdebug.log=/tmp/xdebug.log
+  xdebug.log_level=10
+  ```
+  Replace `<your_host_ip>` with your actual host IP (see below).
+
+### 2. VS Code launch.json configuration
+- Add to `.vscode/launch.json`:
+  ```json
+  {
+    "name": "Listen for Xdebug",
+    "type": "php",
+    "request": "launch",
+    "port": 9003,
+    "pathMappings": {
+      "/var/www/html": "${workspaceFolder}"
+    }
+  }
+  ```
+
+### 3. Remove port mapping for 9003 in Docker Compose
+- Do **not** expose port 9003 in your `docker-compose.yml`:
+  ```yaml
+  # Remove or comment out:
+  # ports:
+  #   - "9003:9003"
+  ```
+  Xdebug connects out to VS Code; you do not need to expose this port.
+
+### 4. Find your host IP address
+- Run:
+  ```bash
+  hostname -I
+  ```
+- Use the first IP address in your `xdebug.ini` as `xdebug.client_host`.
+
+### 5. Start VS Code debugger
+- Open the Run and Debug panel in VS Code.
+- Select "Listen for Xdebug" and click the green start button.
+- The blue bar at the bottom of VS Code means it is listening.
+
+### 6. Verify port usage with netstat
+- To check which process is listening on port 9003:
+  ```bash
+  sudo netstat -tulnp | grep 9003
+  ```
+  - `-t` = TCP
+  - `-u` = UDP
+  - `-l` = Listening sockets
+  - `-n` = Show numeric addresses/ports
+  - `-p` = Show process ID/program name
+- You should see VS Code (`code`) listening, not Docker.
+- If Docker is listening, remove the port mapping and restart.
+
+### 7. Troubleshooting Xdebug connection
+- If breakpoints are not hit:
+  - Check `/tmp/xdebug.log` inside the container for connection attempts/errors:
+    ```bash
+    docker exec -it <container_name> cat /tmp/xdebug.log
+    ```
+  - Common error: `getaddrinfo: No such file or directory` for `host.docker.internal` on Linux. Use your host IP instead.
+  - Make sure VS Code is running and listening before triggering PHP code.
+
+### 8. Test with a minimal script
+- Create `public/test.php`:
+  ```php
+  <?php
+  xdebug_break();
+  echo "Test";
+  ```
+- Set a breakpoint and access `http://localhost:8081/test.php`.
+
+### 9. Summary of key lessons
+- On Linux, use your host IP for `xdebug.client_host`.
+- Do not expose port 9003 in Docker Compose.
+- Use netstat to check port usage and resolve conflicts.
+- Always check Xdebug logs for connection issues.
+
+---
+
+Add these steps to your workflow for reliable PHP debugging in Docker with VS Code!

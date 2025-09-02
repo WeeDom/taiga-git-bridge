@@ -5,7 +5,8 @@ use Slim\Factory\AppFactory;
 $app = AppFactory::create();
 
 $app->get('/', function ($request, $response, $args) {
-    $response->getBody()->write("Hello from SlimPHP, now with the correct dirs!");
+    phpinfo();
+    $response->getBody()->write("Hello from SlimPHP, now with debug!");
     return $response;
 });
 
@@ -58,8 +59,8 @@ $app->get('/routes', function ($request, $response, $args) use ($app) {
 });
 
 $app->map(['GET', 'POST'], '/webhook', function ($request, $response, $args) {
-    $data = $request->getParsedBody();
-    $response->getBody()->write('Webhook received: ' . json_encode($data));
+    $data = json_decode($request->getBody()->getContents(), true);
+    $response->getBody()->write('Webhook received where the new story is: ' . $data["by"]["username"]);
     return $response->withHeader('Content-Type', 'application/json');
 });
 
