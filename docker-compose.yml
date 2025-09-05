@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   app:
+    container_name: taiga-bridge
     build: .
     ports:
       - "8081:80"
@@ -8,4 +9,5 @@ services:
       - .env
     volumes:
       - .:/var/www/html
+      - ./logs:/var/log/apache2
     restart: unless-stopped
