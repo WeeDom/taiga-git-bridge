@@ -10,7 +10,6 @@ use App\BridgeHandlers\WebhookHandler;
 
 
 $app->get('/', function ($request, $response, $args) {
-    phpinfo();
     $response->getBody()->write("Hello from SlimPHP, now with debug!");
     return $response;
 });
